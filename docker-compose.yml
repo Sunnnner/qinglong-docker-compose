@@ -1,0 +1,78 @@
+version: '3'
+services:
+  redis:
+    image: redis:latest
+    volumes:
+      - /srv/admin/redis/data:/data:rw
+      - /srv/admin/redis/conf/redis.conf:/etc/redis/redis.conf
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "1"
+  sillyplus:
+    image: jackytj/sillyplus:latest
+    restart: always
+    volumes:
+      - /srv/sillyplus:/etc/sillyplus
+    environment:
+      - LETSENCRYPT_HOST=xx.com.cn
+      - LETSENCRYPT_EMAIL=xx@163.com
+      - VIRTUAL_HOST=xx.com.cn
+      - VIRTUAL_PORT=8080
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "1"
+    links:
+      - redis
+  ql:
+    image: whyour/qinglong:latest
+    volumes:
+      - /srv/admin/ql/data:/ql/data
+    environment:
+      # 部署路径非必须，以斜杠开头和结尾，比如 /test/
+      # - QlBaseUrl='/test/'
+      - VIRTUAL_HOST=xx.com.cn
+      - LETSENCRYPT_HOST=xx.com.cn
+      - LETSENCRYPT_EMAIL=xx@163.com
+      - VIRTUAL_PORT=5700
+    restart: always
+  nginx:
+    image:  nginxproxy/nginx-proxy:alpine
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - /srv/admin/proxy/certs:/etc/nginx/certs:ro
+      - /srv/admin/proxy/vhost.d:/etc/nginx/vhost.d
+      - /srv/admin/proxy/html:/usr/share/nginx/html
+    container_name: nginx-proxy
+    ports:
+      - 80:80
+      - 443:443
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "1"
+  https:
+    image: nginxproxy/acme-companion:2.2
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /srv/admin/proxy/certs:/etc/nginx/certs
+      - /srv/admin/proxy/vhost.d:/etc/nginx/vhost.d
+      - /srv/admin/proxy/html:/usr/share/nginx/html
+      - /srv/admin/proxy/acme:/etc/acme.sh
+    container_name: nginx-proxy-acme
+    environment:
+      - DEFAULT_EMAIL=xx@163.com
+      - NGINX_PROXY_CONTAINER=nginx-proxy
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "1"
